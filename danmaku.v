@@ -1,38 +1,45 @@
 
-struct Vector2 {
-	x f32
-	y f32
-}
+module main
 
-fn (a Vector2) add(b Vector2) Vector2 {
-	return Vector2{
-		x:a.x + b.x
-		y:a.y + b.y
-	}
-}
+import vector2
 
 fn main() {
-	mut vec := Vector2{
-		x: 5,
-		y: 10
-	}
+	mut vec := vector2.new(5, 10)
 
-	println("1st Vector:")
+	println('1st Vector:')
 	println(vec)
-	println("")
+	println('')
 
-	mut vec2 := Vector2{
-		x: 10,
-		y: 10
-	}
+	mut vec2 := vector2.new(10, 10)
 
-	println("2nd Vector:")
+	println('2nd Vector:')
 	println(vec2)
-	println("")
+	println('')
 
 	mut vec3 := vec.add(vec2)
+  mut mag := vec3.magnitude()
 
-	println("Add 1st with 2nd:")
+	println('Vector 3 = Vector 1 + Vector 2')
 	println(vec3)
+	println('')
+
+	println('Magnitude of Vector 3')
+	println(mag)
+	println('')
+
+  vec3 = vec3.add(vector2.down)
+  mag = vec3.magnitude()
+
+	println('Add Vector2.Down (shorthand for Vector2{0, -1}) to Vector3')
+	println(vec3)
+	println('')
+
+	println('Magnitude of Vector 3 after addition')
+	println(mag)
+	println('')
+
+	println('Normalized Vector 3')
+	println(vec3.normalize())
+	println('')
 }
 
