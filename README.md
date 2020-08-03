@@ -1,7 +1,7 @@
 # danmaku-v
 Danmaku Game written in V (https://github.com/vlang/v)
 
-Current Phase: Building Game Engine Core
+Current Phase: Learn V more and trying to build the core engine
 
 TODO: 
 ```

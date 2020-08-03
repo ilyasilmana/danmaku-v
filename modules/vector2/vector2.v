@@ -1,3 +1,6 @@
+// Vector2 Library
+// Inspired by Unity's Vector2
+
 module vector2
 
 import math
@@ -5,6 +8,7 @@ import math
 struct C.math{}
 
 pub struct Vector2 {
+pub mut:
 	x f32
 	y f32
 }
