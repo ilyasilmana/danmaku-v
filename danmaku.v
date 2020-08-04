@@ -7,6 +7,7 @@ import math
 import os
 import sokol.sapp
 import time
+import collision
 import vector2
 
 // import danmaku_v.vector2
@@ -16,9 +17,10 @@ mut:
 	height          int
 	width           int
 	draw_fn         voidptr
-	arrow_state     ArrowState
-	bullets         []&Bullet
+	arrow_state     &ArrowState
 	player          &Player
+	bullets         []&Bullet
+	player_bullets  []&Bullet
 	stgframe_width  int
 	stgframe_height int
 	ingame_player_x int
@@ -27,27 +29,38 @@ mut:
 
 struct ArrowState {
 mut:
-	up    bool
-	down  bool
-	left  bool
-	right bool
+	up    bool = false
+	down  bool = false
+	left  bool = false
+	right bool = false
+}
+
+enum BulletOwner {
+	player
+	enemy
 }
 
 struct Bullet {
 mut:
-	pos   vector2.Vector2
-	speed f32
-	angle f32
-	color gx.Color
+	pos      vector2.Vector2
+	speed    f32
+	angle    f32
+	color    gx.Color
+	owner    BulletOwner
+	collider collision.Collision
 }
 
 struct Player {
 mut:
-	pos         vector2.Vector2
-	speed       f32
-	speed_slow	f32
-	is_slowing  bool
-	is_shooting bool
+	pos             vector2.Vector2
+	speed           f32
+	speed_slow      f32
+	is_slowing      bool
+	is_shooting     bool
+	shoot_delay     int
+	shoot_delay_max int
+	lifes           int
+	collider        collision.Collision
 }
 
 const (
@@ -75,6 +88,11 @@ const (
 		size: 24
 		align: gx.align_right
 	}
+	text_cfg2     = gx.TextCfg{
+		color: gx.rgb(255, 255, 255)
+		size: 24
+		align: gx.align_right
+	}
 )
 
 const (
@@ -90,6 +108,10 @@ fn init_game() {
 		pos: vector2.new(gameframe_w / 2, bounds_bottom - 40)
 		speed: 3.7
 		speed_slow: 1.6
+		shoot_delay: 0
+		shoot_delay_max: 3
+		lifes: 999
+		collider: collision.new(1)
 	}
 	mut game := &Game{
 		gg: 0
@@ -99,6 +121,7 @@ fn init_game() {
 		stgframe_height: gameframe_h
 		player: player
 		draw_fn: 0
+		arrow_state: &ArrowState{false, false, false, false}
 	}
 	game.gg = gg.new_context({
 		width: window_width
@@ -126,6 +149,7 @@ fn frame(mut game Game) {
 
 fn (mut game Game) updater() {
 	for {
+		game.update_player_bullets()
 		game.update_bullets()
 		game.update_player()
 		time.sleep_ms(17)
@@ -133,9 +157,17 @@ fn (mut game Game) updater() {
 }
 
 fn (mut game Game) renderer() {
+	// Player Bullet
+	for i in 0 .. game.player_bullets.len {
+		mut bullet := game.player_bullets[i]
+		game.gg.draw_rect(bullet.pos.x + 32 - 2.5, bullet.pos.y + 16 - 5, 5, 10, bullet.color)
+	}
 	// Player
 	player_pos := game.player.pos
-	game.gg.draw_rect(player_pos.x - 10, player_pos.y - 10, 20, 20, colors[5])
+	game.gg.draw_rect(player_pos.x + 32 - 10, player_pos.y + 16 - 10, 20, 20, colors[5])
+	if game.player.is_slowing == true {
+		game.gg.draw_rect(player_pos.x + 32 - 2, player_pos.y + 16 - 2, 4, 4, colors[1])
+	}
 	// Bullet
 	for i in 0 .. game.bullets.len {
 		mut bullet := game.bullets[i]
@@ -144,6 +176,7 @@ fn (mut game Game) renderer() {
 	// UI
 	game.draw_game_frame(bounds_left, bounds_right, bounds_top, bounds_bottom, colors[8])
 	game.gg.draw_text(630, 450, 'Bullets: $game.bullets.len', text_cfg)
+	game.gg.draw_text(bounds_right + 30, 80, 'Player: $game.player.lifes', text_cfg2)
 }
 
 fn (mut game Game) run() {
@@ -175,8 +208,14 @@ fn (mut game Game) shoot_circle(density int) {
 }
 
 fn (mut game Game) create_bullet(x, y, speed, angle f32, color gx.Color) {
-	pos := vector2.new(x, y)
-	bullet := &Bullet{pos, speed, angle, color}
+	bullet := &Bullet{
+		pos: vector2.new(x, y)
+		speed: speed
+		angle: angle
+		color: color
+		owner: BulletOwner.enemy
+		collider: collision.new(5)
+	}
 	game.bullets << bullet
 }
 
@@ -192,6 +231,8 @@ fn (mut game Game) update_bullets() {
 			y := bullet.pos.y + bullet.speed * math.sin(f32(bullet.angle) * (math.pi / 180))
 			bullet.pos.x = f32(x)
 			bullet.pos.y = f32(y)
+			bullet.collider.pos.x = f32(x)
+			bullet.collider.pos.y = f32(y)
 		}
 	}
 }
@@ -206,6 +247,18 @@ fn (mut game Game) draw_game_frame(left, right, top, bottom int, color gx.Color)
 	game.gg.draw_rect(right, 0, window_width - right, window_height, color) // RIGHT
 	game.gg.draw_rect(0, 0, window_width, top, color) // TOP
 	game.gg.draw_rect(0, bottom, window_width, window_height - bottom, color) // BOTTOM
+}
+
+fn (mut game Game) create_player_bullet(x, y, speed, angle f32, color gx.Color) {
+	bullet := &Bullet{
+		pos: vector2.new(x, y)
+		speed: speed
+		angle: angle
+		color: color
+		owner: BulletOwner.player
+		collider: collision.new(5)
+	}
+	game.player_bullets << bullet
 }
 
 fn (mut game Game) update_player() {
@@ -223,6 +276,65 @@ fn (mut game Game) update_player() {
 		game.player.pos.x -= speed
 	} else if game.arrow_state.right == true {
 		game.player.pos.x += speed
+	}
+	// When Hit bounds
+	if game.player.pos.x < 10 {
+		game.player.pos.x = 10
+	}
+	if game.player.pos.x > gameframe_w - 10 {
+		game.player.pos.x = gameframe_w - 10
+	}
+	if game.player.pos.y < 10 {
+		game.player.pos.y = 10
+	}
+	if game.player.pos.y > gameframe_h - 10 {
+		game.player.pos.y = gameframe_h - 10
+	}
+	// Update player collision box
+	game.player.collider.pos.x = f32(game.player.pos.x)
+	game.player.collider.pos.y = f32(game.player.pos.y)
+	go game.check_player_collision()
+	// Shoot
+	if game.player.is_shooting == true {
+		if game.player.shoot_delay > 0 {
+			game.player.shoot_delay--
+		} else {
+			game.create_player_bullet(game.player.pos.x - 7, game.player.pos.y, 28, 270,
+				gx.white)
+			game.create_player_bullet(game.player.pos.x + 7, game.player.pos.y, 28, 270,
+				gx.white)
+			game.player.shoot_delay = game.player.shoot_delay_max
+		}
+	} else {
+		game.player.shoot_delay = 0
+	}
+}
+
+fn (mut game Game) check_player_collision() {
+	for i in 0 .. game.bullets.len {
+		mut bullet := game.bullets[i]
+		if bullet.collider.check(game.player.collider) {
+			game.player_bullets.delete(i)
+			game.player.lifes--
+		}
+	}
+}
+
+fn (mut game Game) update_player_bullets() {
+	for i in 0 .. game.player_bullets.len {
+		mut bullet := game.player_bullets[i]
+		if bullet.is_outofbound() {
+			// remove bullet if bullet is out
+			game.player_bullets.delete(i)
+		} else {
+			// Updating the bullet position, etc.
+			x := bullet.pos.x + bullet.speed * math.cos(f32(bullet.angle) * (math.pi / 180))
+			y := bullet.pos.y + bullet.speed * math.sin(f32(bullet.angle) * (math.pi / 180))
+			bullet.pos.x = f32(x)
+			bullet.pos.y = f32(y)
+			bullet.collider.pos.x = f32(x)
+			bullet.collider.pos.y = f32(y)
+		}
 	}
 }
 
@@ -266,6 +378,14 @@ fn on_event(e &sapp.Event, mut game Game) {
 			}
 			if e.typ == .key_up {
 				game.player.is_slowing = false
+			}
+		}
+		.z {
+			if e.typ == .key_down {
+				game.player.is_shooting = true
+			}
+			if e.typ == .key_up {
+				game.player.is_shooting = false
 			}
 		}
 		else {}

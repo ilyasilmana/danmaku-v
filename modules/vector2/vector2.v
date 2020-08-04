@@ -36,12 +36,25 @@ pub fn (a Vector2) add(b Vector2) Vector2 {
 	}
 }
 
+// Subtract a vector with other vector
+pub fn (a Vector2) sub(b Vector2) Vector2 {
+	return Vector2{
+		x: a.x - b.x
+		y: a.y - b.y
+	}
+}
+
 // Multiply Vector by value
 pub fn (a Vector2) mul(b f32) Vector2 {
   return Vector2{
-    x: a.x * b,
+    x: a.x * b
     y: a.y * b
   }
+}
+
+// Distance between a and b
+pub fn (a Vector2) distance(b Vector2) f32 {
+	return a.sub(b).magnitude()
 }
 
 // Dot product a vector with other

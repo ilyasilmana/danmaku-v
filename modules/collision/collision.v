@@ -2,11 +2,19 @@ module collision
 
 import vector2
 
-struct Collision {
-	pos vector2.vector2
+pub struct Collision {
+pub mut:
+	pos vector2.Vector2
 	rad f32
 }
 
-pub fn check() {
-	
+pub fn new(rad f32) Collision {
+	return Collision{
+		pos: vector2.new(0, 0)
+		rad: rad
+	}
+}
+
+pub fn (mut col Collision) check(mut other Collision) bool {
+	return other.pos.distance(col.pos) > (col.rad + other.rad)
 }
