@@ -52,6 +52,11 @@ pub fn (a Vector2) mul(b f32) Vector2 {
   }
 }
 
+// Angle between a and b, returned as radians
+pub fn (a Vector2) angle(b Vector2) f32 {
+	return f32(math.atan2((a.y - b.y), (a.x - b.x)))
+}
+
 // Distance between a and b
 pub fn (a Vector2) distance(b Vector2) f32 {
 	return a.sub(b).magnitude()

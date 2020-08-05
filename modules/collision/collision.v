@@ -15,6 +15,14 @@ pub fn new(rad f32) Collision {
 	}
 }
 
+pub fn (mut col Collision) uncollide_minimum(mut other Collision) f32 {
+	return (col.rad + other.rad)
+}
+
 pub fn (mut col Collision) check(mut other Collision) bool {
-	return other.pos.distance(col.pos) > (col.rad + other.rad)
+	return other.pos.distance(col.pos) < (col.rad + other.rad)
+}
+
+pub fn (mut col Collision) distance(mut other Collision) f32 {
+	return other.pos.distance(col.pos)
 }
